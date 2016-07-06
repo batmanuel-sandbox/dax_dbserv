@@ -24,5 +24,4 @@ Resources
 dbserv currently only implements the `sync` endpoint from TAP.
 
 :doc:`Sync <sync>`
-   A Product represents a software project or a writing project.
-   Generally speaking, a Product maps to a GitHub repository or an Eups meta-product.
+   sync endpoint to dbserv. See [TAP's /sync description](http://www.ivoa.net/documents/TAP/20100327/REC-TAP-1.0.html#_2_2_1___sync)

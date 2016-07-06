@@ -21,3 +21,19 @@
 #
 
 from .version import *
+from flask import Flask
+from lsst.dax.dbserv import dbREST_v0
+
+
+def create_app(profile="development"):
+    app = Flask(__name__)
+
+    if profile == "production":
+        from lsst.db.engineFactory import getEngineFromFile
+        # Configure Engine
+        defaults_file = "~/.lsst/dbAuth-dbServ.ini"
+        engine = getEngineFromFile(defaults_file)
+        app.config["default_engine"] = engine
+
+    app.register_blueprint(dbREST_v0.dbREST, url_prefix='/tap')
+    return app

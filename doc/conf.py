@@ -20,7 +20,7 @@ import os
 import sys
 # sys.path.insert(0, os.path.abspath('.'))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
-                                                '../')))
+                                                '../python')))
 
 # -- General configuration ------------------------------------------------
 
@@ -33,7 +33,44 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
 # ones.
 extensions = [
     'sphinx.ext.autodoc',
+    'sphinx.ext.doctest',
+    'sphinx.ext.intersphinx',
+    'sphinx.ext.todo',
+    'sphinx.ext.coverage',
+    'sphinx.ext.ifconfig',
+    'sphinx.ext.viewcode',
+    'numpydoc',
+    'sphinxcontrib.httpdomain',
+    'sphinxcontrib.autohttp.flask',
 ]
+
+on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
+
+# The theme to use for HTML and HTML Help pages.
+# Use the default readthedocs.org theme if on RTD
+if on_rtd:
+    html_theme = 'default'
+    print('not on read the docs')
+else:
+    import sphinx_rtd_theme
+    html_theme = 'sphinx_rtd_theme'
+    html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
+
+# autodoc_mock_imports = [
+#     'lsst.dax.webservcommon',
+#     'lsst.dax.webservcommon.render_response'
+# ]
+
+
+class Mock(object):
+    def __init__(self, *args):
+        pass
+
+    def __getattr__(self, name):
+        return Mock
+
+import sys
+sys.modules["lsst.dax.webservcommon"] = Mock()
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -53,8 +90,8 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'dbserv'
-copyright = u'2016, Brian VK'
-author = u'Brian VK'
+copyright = u'2016, Brian Van Klaveren'
+author = u'Brian Van Klaveren'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
