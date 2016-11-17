@@ -24,6 +24,7 @@ metadata and rows to determine field types for a given result set.
 """
 
 from base64 import b64encode
+from decimal import Decimal
 
 import MySQLdb
 from MySQLdb.constants.FLAG import BINARY
@@ -52,6 +53,13 @@ class MySQLFieldHelper:
             else:
                 # If there's a scale, use double, otherwise assume long
                 self.datatype = "double" if scale else "long"
+                """
+                TODO: Default to the actual value so long as x is not of type Decimal.
+                If x is a decimal, convert to string and back to float
+                This is inefficient, but we need to support fixed point numbers to
+                fix it properly.
+                """
+                self.converter = lambda x: x if not isinstance(x, Decimal) else float(str(x))
 
         # Check datetime and date
         if type_code in MySQLdb.DATETIME:
