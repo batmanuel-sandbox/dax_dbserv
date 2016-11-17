@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python
 
 # LSST Data Management System
@@ -35,7 +36,7 @@ import logging as log
 from httplib import OK, INTERNAL_SERVER_ERROR
 
 from flask import Blueprint, request, current_app, make_response, render_template
-from sqlalchemy import text
+from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 
 from lsst.dax.dbserv.compat.fields import MySQLFieldHelper
@@ -66,7 +67,7 @@ def sync_query():
         sql = query.encode('utf8')
         log.debug(sql)
         try:
-            engine = current_app.config["default_engine"]
+            engine = _get_engine()
             results = []
             helpers = []
             rows = engine.execute(text(sql))
@@ -97,6 +98,20 @@ def sync_query():
         return _response(response, status_code)
     else:
         return "Listing queries is not implemented."
+
+
+def _get_engine():
+    # Look for a dbserv-specific config URL, otherwise use default engine.
+    db_engine = current_app.config.get("dax.dbserv.db.engine", None)
+    if not db_engine:
+        db_url = current_app.config.get("dax.dbserv.db.url", None)
+        if db_url:
+            pool_size = current_app.config.get("dax.dbserv.db.pool_size", 10)
+            db_engine = create_engine(db_url, pool_size=pool_size)
+        else:
+            db_engine = current_app.config["default_engine"]
+        current_app.config["dax.dbserv.db.engine"] = db_engine
+    return db_engine
 
 
 def _error(exception, message):
