@@ -29,6 +29,9 @@ from decimal import Decimal
 import MySQLdb
 from MySQLdb.constants.FLAG import BINARY
 
+# FIXME: This should be fixed at some future point in MySQLdb
+NUMBERS = MySQLdb.NUMBER.union([MySQLdb.FIELD_TYPE.NEWDECIMAL])
+
 
 class MySQLFieldHelper:
     def __init__(self, description, flags, value):
@@ -46,7 +49,7 @@ class MySQLFieldHelper:
         type_code = description[1]
         scale = description[5]
 
-        if type_code in MySQLdb.NUMBER:
+        if type_code in NUMBERS:
             # Use python types first, fallback on float otherwise (e.g. NoneType)
             if isinstance(value, int):
                 self.datatype = "int"
@@ -91,6 +94,6 @@ class MySQLFieldHelper:
         @param value:
         @return: The value itself, or a stringified version if it needs to be stringified.
         """
-        if self.converter and value:
+        if self.converter and value is not None:
             return self.converter(value)
         return value
