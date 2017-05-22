@@ -1,6 +1,3 @@
-
-#!/usr/bin/env python
-
 # LSST Data Management System
 # Copyright 2015 AURA/LSST.
 #
@@ -146,11 +143,14 @@ votable_mappings = {
 
 
 def _response(response, status_code):
-    fmt = request.accept_mimetypes.best_match(['application/json', 'text/html', 'application/x-votable+xml'])
+    fmt = request.accept_mimetypes.best_match(['application/json', 'text/html',
+                                               'application/x-votable+xml'])
     if fmt == 'text/html':
         response = render_response(response=response, status_code=status_code)
     elif fmt == 'application/x-votable+xml':
-        response = render_template('votable.xml.j2', result=response["result"], mappings=votable_mappings)
+        response = render_template('votable.xml.j2',
+                                   result=response["result"],
+                                   mappings=votable_mappings)
     else:
         response = json.dumps(response)
     return make_response(response, status_code)
