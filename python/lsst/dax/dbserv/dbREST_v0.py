@@ -36,8 +36,9 @@ import logging as log
 from httplib import OK, INTERNAL_SERVER_ERROR
 
 from flask import Blueprint, request, current_app, make_response, render_template
-from sqlalchemy import create_engine, text
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import create_engine, text, event
+from sqlalchemy.engine import Engine
+from sqlalchemy.exc import SQLAlchemyError, InterfaceError
 
 from lsst.dax.dbserv.compat.fields import MySQLFieldHelper
 from lsst.dax.webservcommon import render_response
@@ -98,6 +99,22 @@ def sync_query():
         return _response(response, status_code)
     else:
         return "Listing queries is not implemented."
+
+
+@event.listens_for(Engine, "handle_error")
+def handle_qserv_exception(context):
+    conn = context.connection.connection
+    if hasattr(conn, "error") and context.original_exception.args[0] == -1:
+        # Handle Qserv Errors where we return error codes above those
+        # identified by the MySQLdb driver.
+        # The MySQL driver, by default, returns a "whack" error code
+        # if this is the case with error == -1.
+        from _mysql_exceptions import InterfaceError as MysqlIError
+        old_exc = context.sqlalchemy_exception
+        orig = MysqlIError(conn.errno(), conn.error())
+        return InterfaceError(old_exc.statement, old_exc.params,
+                              orig, old_exc.connection_invalidated)
+    pass
 
 
 def _get_engine():
