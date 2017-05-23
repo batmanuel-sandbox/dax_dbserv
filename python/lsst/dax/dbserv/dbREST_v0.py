@@ -1,6 +1,3 @@
-
-#!/usr/bin/env python
-
 # LSST Data Management System
 # Copyright 2015 AURA/LSST.
 #
@@ -36,8 +33,9 @@ import logging as log
 from httplib import OK, INTERNAL_SERVER_ERROR
 
 from flask import Blueprint, request, current_app, make_response, render_template
-from sqlalchemy import create_engine, text
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import create_engine, text, event
+from sqlalchemy.engine import Engine
+from sqlalchemy.exc import SQLAlchemyError, InterfaceError
 
 from lsst.dax.dbserv.compat.fields import MySQLFieldHelper
 from lsst.dax.webservcommon import render_response
@@ -100,6 +98,22 @@ def sync_query():
         return "Listing queries is not implemented."
 
 
+@event.listens_for(Engine, "handle_error")
+def handle_qserv_exception(context):
+    conn = context.connection.connection
+    if hasattr(conn, "error") and context.original_exception.args[0] == -1:
+        # Handle Qserv Errors where we return error codes above those
+        # identified by the MySQLdb driver.
+        # The MySQL driver, by default, returns a "whack" error code
+        # if this is the case with error == -1.
+        from _mysql_exceptions import InterfaceError as MysqlIError
+        old_exc = context.sqlalchemy_exception
+        orig = MysqlIError(conn.errno(), conn.error())
+        return InterfaceError(old_exc.statement, old_exc.params,
+                              orig, old_exc.connection_invalidated)
+    pass
+
+
 def _get_engine():
     # Look for a dbserv-specific config URL, otherwise use default engine.
     db_engine = current_app.config.get("dax.dbserv.db.engine", None)
@@ -129,11 +143,14 @@ votable_mappings = {
 
 
 def _response(response, status_code):
-    fmt = request.accept_mimetypes.best_match(['application/json', 'text/html', 'application/x-votable+xml'])
+    fmt = request.accept_mimetypes.best_match(['application/json', 'text/html',
+                                               'application/x-votable+xml'])
     if fmt == 'text/html':
         response = render_response(response=response, status_code=status_code)
     elif fmt == 'application/x-votable+xml':
-        response = render_template('votable.xml.j2', result=response["result"], mappings=votable_mappings)
+        response = render_template('votable.xml.j2',
+                                   result=response["result"],
+                                   mappings=votable_mappings)
     else:
         response = json.dumps(response)
     return make_response(response, status_code)
