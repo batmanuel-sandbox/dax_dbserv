@@ -57,7 +57,7 @@ class TestMySqlQuery(unittest.TestCase):
 
         for query, results in self.queries.items():
             resp = self.client.post("/tap/sync?query=" + query, headers={"accept": "text/html"})
-            print resp
+            print(resp)
             expected_row = "<td>" + "</td><td>".join([str(i) for i in results[0]]) + "</td>"
             self.assertIn(expected_row, resp.data)
 
@@ -65,7 +65,7 @@ class TestMySqlQuery(unittest.TestCase):
 
         for query, results in self.queries.items():
             resp = self.client.post("/tap/sync?query=" + query, headers={"accept": "application/x-votable+xml"})
-            print resp.data
+            print(resp.data)
             expected_row = "<TD>" + "</TD><TD>".join([str(i) for i in results[0]]) + "</TD>"
             self.assertIn(expected_row, resp.data)
 

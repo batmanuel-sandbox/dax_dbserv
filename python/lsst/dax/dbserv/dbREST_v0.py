@@ -30,7 +30,7 @@ Supported formats: json and html.
 
 import json
 import logging as log
-from httplib import OK, INTERNAL_SERVER_ERROR
+from http.client import OK, INTERNAL_SERVER_ERROR
 
 from flask import Blueprint, request, current_app, make_response, render_template
 from sqlalchemy import create_engine, text, event
