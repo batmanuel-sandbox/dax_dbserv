@@ -54,31 +54,30 @@ def root():
 
 @dbREST.route('/sync', methods=['POST'])
 def sync_query():
-    """
-    If sql is not passed, it lists queries running for a given user.
-    If sql is passed, it runs a given query.
+    """Synchronously run a query.
     :return: A proper response object
     """
 
     query = request.args.get("query", request.form.get("query", None))
     if query:
-        sql = query.encode('utf8')
-        log.debug(sql)
+        log.debug(query)
         try:
             engine = _get_engine()
             results = []
             helpers = []
-            rows = engine.execute(text(sql))
+            rows = engine.execute(text(query))
             curs = rows.cursor
 
-            for result in rows:
-                # If this is the first time, build column definitions (use raw values to help)
+            for row in rows:
+                # If this is the first row, build column definitions
+                # (use raw values to help)
                 if not helpers:
-                    for desc, flags, val in zip(curs.description, curs.description_flags, result):
+                    for desc, flags, val in zip(curs.description,
+                                                curs.description_flags, row):
                         helpers.append(MySQLFieldHelper(desc, flags, val))
 
                 # Not streaming...
-                results.append([helper.check_value(val) for helper, val in zip(helpers, result)])
+                results.append([helper.check_value(val) for helper, val in zip(helpers, row)])
 
             status_code = OK
             elements = []
