@@ -30,17 +30,37 @@ Supported formats: json and html.
 
 import json
 import logging as log
-from http.client import OK, INTERNAL_SERVER_ERROR
+from http.client import OK, INTERNAL_SERVER_ERROR, CREATED
+import traceback
 
-from flask import Blueprint, request, current_app, make_response, render_template
+from flask import Blueprint, request, current_app, make_response, \
+    render_template, jsonify, url_for
 from sqlalchemy import create_engine, text, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import SQLAlchemyError, InterfaceError
 
 from lsst.dax.dbserv.compat.fields import MySQLFieldHelper
 from lsst.dax.webservcommon import render_response
+from .uws.driver import AsyncDriver, AsyncDriverError
+from .model import DriverJob
 
 dbREST = Blueprint('dbREST', __name__, template_folder='templates')
+
+
+@dbREST.errorhandler(Exception)
+def handle_unhandled_exceptions(error):
+    log.error("Error handling request:\n {}".format(error))
+    log.error(traceback.format_exc())
+    err = {
+        "exception": error.__class__.__name__,
+        "message": error.args[0]
+    }
+
+    if len(error.args) > 1:
+        err["more"] = [str(arg) for arg in error.args[1:]]
+    response = jsonify(err)
+    response.status_code = INTERNAL_SERVER_ERROR
+    return response
 
 
 @dbREST.route('/', methods=['GET'])
@@ -92,9 +112,71 @@ def sync_query():
             log.debug("Encountered an error processing request: '%s'" % e.message)
             response = _error(type(e).__name__, e.message)
             status_code = INTERNAL_SERVER_ERROR
-        return _response(response, status_code)
+        return _response(response, None, status_code)
     else:
         return "Listing queries is not implemented."
+
+
+@dbREST.route('/async', methods=['POST'])
+def async_query():
+    """Asynchronously run a query.
+    :return: A proper response object
+    """
+
+    query = request.args.get("query", request.form.get("query", None))
+    log.debug(query)
+    db_url = _get_db_url_from_query(query)
+    async_driver = _get_async_driver(db_url)
+    user_context = _get_user_info(request)
+    driver_job_id = async_driver.submit(query, db_url, user_context)
+
+    session = Session()
+
+    driver_job = DriverJob(job_id=driver_job_id,
+                           driver_name=async_driver.__name__)
+    session.add(driver_job)
+    session.flush()
+
+    url = url_for(".async_job", job_id=driver_job_id,
+                  _external=True)
+    response = jsonify({"result": {"jobId": driver_job_id,
+                                   "url": url}})
+    response.headers["Location"] = url
+    response.status_code = CREATED
+    return response
+
+
+@dbREST.route('/async/<string:job_id>/', methods=['GET'])
+def async_job(job_id):
+    """Asynchronously run a query.
+    :return: A proper response object
+    """
+
+    session = Session()
+    driver_job = session.query(DriverJob).filter(
+        DriverJob.job_id == job_id).first()
+    driver = _get_async_driver(driver=driver_job.driver)
+    job = driver.job(driver_job.job_id)
+
+    url = url_for(".async_query_result", job_id=driver_job_id,
+                  _external=True)
+    response = jsonify({"result": {"jobId": driver_job_id,
+                                   "url": url}})
+    response.headers["Location"] = url
+    response.status_code = CREATED
+    return response
+
+
+def _get_db_url_from_query(query):
+    return _get_engine().url
+
+
+def _get_user_info(_request):
+    return {}
+
+
+def _get_async_driver(db_url):
+    return AsyncDriver()
 
 
 @event.listens_for(Engine, "handle_error")
@@ -102,8 +184,8 @@ def handle_qserv_exception(context):
     conn = context.connection.connection
     if hasattr(conn, "error") and context.original_exception.args[0] == -1:
         # Handle Qserv Errors where we return error codes above those
-        # identified by the MySQLdb driver.
-        # The MySQL driver, by default, returns a "whack" error code
+        # identified by the MySQLdb driver_name.
+        # The MySQL driver_name, by default, returns a "whack" error code
         # if this is the case with error == -1.
         from _mysql_exceptions import InterfaceError as MysqlIError
         old_exc = context.sqlalchemy_exception
@@ -141,7 +223,7 @@ votable_mappings = {
 }
 
 
-def _response(response, status_code):
+def _response(response, _request, status_code):
     fmt = request.accept_mimetypes.best_match(['application/json', 'text/html',
                                                'application/x-votable+xml'])
     if fmt == 'text/html':
