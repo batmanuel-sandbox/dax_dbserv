@@ -78,7 +78,7 @@ class MySQLFieldHelper:
         if not self.datatype and flags & BINARY and type_code not in MySQLdb.TIME:
             # This needs to be checked BEFORE the next type check
             self.datatype = "binary"
-            self.converter = b64encode
+            self.converter = lambda c: b64encode(c).decode("utf-8")
         elif isinstance(value, str):
             self.datatype = "text"
 
