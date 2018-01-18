@@ -89,8 +89,9 @@ def sync_query():
 
             response = _result(dict(metadata=dict(elements=elements), data=results))
         except SQLAlchemyError as e:
-            log.debug("Encountered an error processing request: '%s'" % e.message)
-            response = _error(type(e).__name__, e.message)
+            log.debug("Encountered an error processing request: '%s'" %
+                    str(e))
+            response = _error(type(e).__name__, str(e))
             status_code = INTERNAL_SERVER_ERROR
         return _response(response, status_code)
     else:

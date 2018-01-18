@@ -52,7 +52,7 @@ class MySQLFieldHelper:
         if type_code in NUMBERS:
             # Use python types first, fallback on float otherwise (e.g. NoneType)
             if isinstance(value, int):
-                self.datatype = "int"
+                self.datatype = "long"
             else:
                 # If there's a scale, use double, otherwise assume long
                 self.datatype = "double" if scale else "long"
